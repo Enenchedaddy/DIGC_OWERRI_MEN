@@ -1,0 +1,2 @@
+[functions.portal-api]
+verify_jwt = false
