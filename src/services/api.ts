@@ -60,6 +60,8 @@ export async function apiFetch<T>(
     const message =
       typeof payload.error === 'string'
         ? payload.error
+        : response.status === 404 && path.startsWith('/api/')
+          ? 'The application API is unavailable. Redeploy the full Node server instead of the frontend files alone.'
         : `Request failed with status ${response.status}`;
     throw new ApiError(message, response.status, payload);
   }

@@ -316,6 +316,11 @@ function validateVisibility(val: unknown, allowed: string[], fallback: string): 
 // PUBLIC ROUTES
 // ---------------------------------------------------------------------------
 
+app.get('/api/health', (_req, res) => {
+  db.prepare('SELECT 1').get();
+  res.json({ status: 'ok', database: 'ok' });
+});
+
 app.get('/api/public/info', (_req, res) => {
   const settings = getSettingsRow();
   const adminCount = getSafeAdminCount();
@@ -1952,6 +1957,12 @@ app.patch('/api/admin/settings', requireAdmin, (req: AuthRequest, res) => {
 
   logActivity(req.authUser!.id, 'fellowship_settings_updated');
   res.json({ settings: getSettingsRow() });
+});
+
+app.use('/api', (req, res) => {
+  res.status(404).json({
+    error: `API route not found: ${req.method} ${req.originalUrl}`,
+  });
 });
 
 app.use((err: unknown, _req: Request, res: Response, _next: NextFunction) => {
