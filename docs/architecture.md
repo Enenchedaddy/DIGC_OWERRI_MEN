@@ -1,16 +1,22 @@
-# Architecture Overview
+# Architecture
 
-## Stack Adaptation
-This project runs on the workspace's full-stack TypeScript runtime:
-- **Frontend**: React 19 + TypeScript + Tailwind CSS v4 (`src/`)
-- **Backend API & Static Host**: Express (`server.ts`) serving both `/api/*` endpoints and Vite in development / `dist/` in production on port `3000`
-- **Database**: Relational SQLite via `better-sqlite3` (`server/db.ts`) stored in `data/fellowship.db` with foreign keys enabled, plus an equivalent PostgreSQL/Supabase RLS migration in `supabase/migrations/001_initial_schema.sql`.
-- **Private Media Storage**: Uploaded portraits and announcement images are validated via magic-byte inspection and stored in `data/uploads/`, served strictly through authorized `/api/uploads/:filename` routes.
+## Production path
 
-## Module Boundaries
-- `server/db.ts`: Schema creation, foreign-key constraints, indexes, initial sample member/announcement seeding (without hardcoded admin accounts).
-- `server/security.ts`: `scrypt` password hashing, HMAC-SHA256 session tokens, magic-byte file verification, input validation, CSV formula neutralization, and server-side privacy field filtering.
-- `server.ts`: Express route handlers enforcing `requireAuth`, `requireApproved`, and `requireAdmin` middleware.
-- `scripts/create-admin.ts`: Interactive CLI administrator provisioning script.
-- `src/context/AuthContext.tsx` & `src/services/api.ts`: Client-side session management holding Bearer tokens in memory (never `localStorage`) plus HttpOnly partitioned cookies for private image requests.
-- `src/pages/*`: Distinct public, member, and administrator views routed behind role and approval guards in `src/App.tsx`.
+- `src/`: React 19 directory interface and approval-gated routes.
+- `src/services/api.ts`: Browser API client. In production it targets the Supabase `portal-api` Edge Function.
+- `supabase/functions/portal-api/index.ts`: Registration, authentication, directory, profile, and administrator endpoints.
+- `supabase/migrations/`: PostgreSQL schema, Row Level Security, private storage, and administrator constraints.
+- Vercel: Static Vite frontend hosting.
+- Supabase: Auth, Postgres, private Storage, and the Edge Function runtime.
+
+The legacy Express/SQLite runtime remains available for local compatibility, but it is not the production deployment target.
+
+## Authorization boundaries
+
+The Edge Function validates every protected request and reads the caller's current profile status and role from the database. Pending, rejected, and suspended users cannot read the member directory. Administrator routes require an approved administrator.
+
+The service-role credential exists only inside the Edge Function environment. Database triggers independently enforce a maximum of three administrators and preserve at least one approved administrator, protecting these invariants from concurrency and direct API misuse.
+
+## Member privacy
+
+Directory responses are assembled server-side. Contact, workplace, birthday, and location fields are filtered using each member's privacy preferences before data reaches the browser. Profile photos are validated on upload and stored in a private bucket; authorized image delivery is mediated by the API.

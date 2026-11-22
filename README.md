@@ -1,18 +1,36 @@
-# DUNAMIS INTERNATIONAL GOSPEL CENTRE, OWERRI — Men's Fellowship Management Portal
+# DIGC Owerri Men's Fellowship Directory
 
-A private, role-based community management platform for the Men's Fellowship of DUNAMIS INTERNATIONAL GOSPEL CENTRE, OWERRI (Imo State, Nigeria), featuring member registration with administrator approval, a searchable member directory, individual privacy controls, upcoming birthdays, Nigerian localization (`+234`, `₦`, `DD/MM/YYYY`, `Africa/Lagos`), and official announcements.
+A private, approval-based member directory for the Men's Fellowship of Dunamis International Gospel Centre, Owerri.
 
-## Key Features
-- **Public Welcome Portal**: Introduces fellowship gatherings and registration without exposing private member data.
-- **Role-Based Access Control**:
-  - **Pending Members**: Blocked from private directory, birthdays, and announcements until verified by an administrator.
-  - **Approved Members**: Access dashboard, searchable/filterable directory, individual profiles, chronological birthdays, announcements, personal profile editing, portrait uploads, and granular privacy preferences.
-  - **Administrators**: Approve/reject/suspend members, edit member records, export CSV, publish/pin/draft announcements, promote trusted administrators, and configure fellowship settings & default privacy policies.
-- **Server-Enforced Privacy & Uploads**: Magic-byte image verification, private upload delivery, scrypt password hashing, and backend field-level privacy filtering.
+## Product flow
+
+1. A man registers and uploads his profile information.
+2. His account remains pending and cannot read the directory.
+3. An administrator verifies and approves the registration.
+4. The approved member signs in directly to the member directory.
+5. Members can search directory cards and open full profiles, subject to each member's privacy preferences.
+
+Administrators are intentionally limited to membership access duties: approving, rejecting, suspending, editing, and exporting member records. The system supports no more than three administrators and prevents removal of the final approved administrator.
+
+## Runtime
+
+- Frontend: React 19, TypeScript, Tailwind CSS, and Vite on Vercel.
+- API: Supabase Edge Function at `supabase/functions/portal-api`.
+- Data and authentication: Supabase Postgres, Auth, and private Storage.
+- Authorization: API validation, database constraints, and Row Level Security.
+
+## Local development
+
+```bash
+npm install
+npm run dev
+```
+
+Use `.env.example` as the environment-variable reference. Never expose the Supabase service-role key in the browser.
 
 ## Documentation
-- [Architecture Overview](docs/architecture.md)
-- [Database Schema](docs/database.md)
-- [Security & Privacy Policies](docs/security.md)
-- [Setup & Admin Provisioning](docs/setup.md)
-- [PostgreSQL / Supabase Migration](supabase/migrations/001_initial_schema.sql)
+
+- [Architecture](docs/architecture.md)
+- [Setup and administrator provisioning](docs/setup.md)
+- [Database schema](docs/database.md)
+- [Security and privacy](docs/security.md)

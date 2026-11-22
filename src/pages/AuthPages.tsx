@@ -135,7 +135,7 @@ const ADMIN_ONLY_ROUTES: AppRoute[] = [
 ];
 
 export function LoginPage({ onNavigate, postLoginRoute }: AuthNavProps) {
-  const { loginWithToken, publicInfo } = useAuth();
+  const { loginWithToken } = useAuth();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [rememberMe, setRememberMe] = useState(true);
@@ -170,7 +170,7 @@ export function LoginPage({ onNavigate, postLoginRoute }: AuthNavProps) {
           postLoginRoute !== 'pending' &&
           postLoginRoute !== 'unauthorized' &&
           (!ADMIN_ONLY_ROUTES.includes(postLoginRoute) || profile.role === 'admin');
-        onNavigate(canUseRequested ? postLoginRoute : profile.role === 'admin' ? 'admin-dashboard' : 'directory');
+        onNavigate(canUseRequested ? postLoginRoute : 'directory');
       } else {
         onNavigate('pending');
       }
@@ -184,7 +184,7 @@ export function LoginPage({ onNavigate, postLoginRoute }: AuthNavProps) {
   return (
     <AuthFrame
       title="Member Sign In"
-      subtitle="Access the private directory, announcements, and fellowship updates."
+      subtitle="Access the private directory of approved fellowship members."
       onBack={() => onNavigate('landing')}
     >
       <form onSubmit={handleSubmit} method="post" className="space-y-4">
@@ -290,15 +290,6 @@ export function LoginPage({ onNavigate, postLoginRoute }: AuthNavProps) {
             Create a member account
           </button>
         </span>
-        {(publicInfo?.needs_admin_setup || publicInfo?.requires_bootstrap_passcode) && (
-          <button
-            type="button"
-            onClick={() => onNavigate('admin-setup')}
-            className="text-xs font-medium text-slate-500 hover:text-slate-900"
-          >
-            Initial Admin Setup
-          </button>
-        )}
       </div>
     </AuthFrame>
   );
@@ -1299,7 +1290,7 @@ export function PendingApprovalPage({ onNavigate }: AuthNavProps) {
     const updated = await refreshSession();
     setChecking(false);
     if (updated?.membership_status === 'approved') {
-      onNavigate(updated.role === 'admin' ? 'admin-dashboard' : 'directory');
+      onNavigate('directory');
     }
   };
 
@@ -1338,7 +1329,7 @@ export function PendingApprovalPage({ onNavigate }: AuthNavProps) {
 
         <p className="mt-3 text-sm leading-relaxed text-slate-600">
           {status === 'pending' &&
-            `Thank you for registering${user ? `, ${user.full_name}` : ''}. To protect member privacy, directory access, announcements, and birthdays are enabled once a fellowship administrator verifies your registration.`}
+            `Thank you for registering${user ? `, ${user.full_name}` : ''}. To protect member privacy, directory access is enabled once a fellowship administrator verifies your registration.`}
           {status === 'suspended' &&
             'Your fellowship portal access has been temporarily suspended. Please reach out to a fellowship administrator for assistance.'}
           {status === 'rejected' &&

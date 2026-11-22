@@ -1,48 +1,67 @@
-# Setup & Deployment Guide
+# Setup and deployment
 
-## Environment Variables
-Configure `.env` (or platform Secrets) based on `.env.example`:
-- `PORT`: Server port (defaults to `3000`).
-- `ADMIN_BOOTSTRAP_PASSCODE`: Optional server-side passcode required to use the `/api/auth/bootstrap-admin` endpoint. Leave empty during initial local setup to claim the first administrator interactively once, or set a strong secret before public deployment.
-- `SESSION_SECRET`: Optional HMAC signing secret (falls back to a random per-process 32-byte key in memory if unset; set a persistent random secret in production).
+## Local development
 
-## Provisioning the First Administrator
-You have two secure options:
-1. **Interactive First-Run Setup UI**: Start the app when no administrator exists yet. A banner on the landing page (or **Initial Admin Setup** on the sign-in screen) lets you create the first administrator account once, after which the setup locks automatically.
-2. **CLI Script**: Run `npx tsx scripts/create-admin.ts` in the project root to create a new administrator or promote an existing user by email.
-
-## Local Development
 ```bash
 npm install
 npm run dev
 ```
-The portal runs on `http://localhost:3000`.
 
-## Production Build & Start
-```bash
-npm run build
-NODE_ENV=production npm start
+The local full-stack compatibility server runs at `http://localhost:3000`. Production uses the Supabase Edge Function for `/api/*` requests.
+
+## Production services
+
+1. Link the Supabase project and configure the Edge Function secrets required by `portal-api`.
+2. Apply the SQL files in `supabase/migrations` in version order.
+3. Deploy `supabase/functions/portal-api/index.ts` with platform JWT verification disabled; the function validates bearer tokens itself because registration and sign-in are public routes.
+4. Configure the Vercel frontend with its public Supabase URL and publishable/anonymous key.
+5. Deploy the Vite build to Vercel.
+
+The Supabase service-role key is server-only. Do not add it to a `VITE_*` variable, client bundle, browser storage, or public repository.
+
+## Provisioning the first administrator
+
+The public first-admin endpoint and UI are disabled. The first administrator must already have completed the ordinary registration flow.
+
+Use a protected project-owner database session to perform these exact steps:
+
+1. Locate the existing account by its normalized email address.
+2. Confirm the profile name and email identify the intended fellowship administrator.
+3. In one protected operation, set `profiles.membership_status` to `approved` and the matching `user_roles.role` to `admin`.
+4. Add an `admin_bootstrapped` activity-log entry.
+5. Verify that the account is approved, has the administrator role, and is included in the administrator count.
+
+Example transaction for a project owner to run in the Supabase SQL Editor after replacing the email placeholder:
+
+```sql
+begin;
+
+do $$
+declare
+  target_id uuid;
+begin
+  select id into target_id
+  from public.profiles
+  where lower(email) = lower('existing.member@example.com');
+
+  if target_id is null then
+    raise exception 'Existing registered member not found';
+  end if;
+
+  update public.profiles
+  set membership_status = 'approved', updated_at = now()
+  where id = target_id;
+
+  update public.user_roles
+  set role = 'admin'
+  where user_id = target_id;
+
+  insert into public.activity_logs (user_id, action, details)
+  values (target_id, 'admin_bootstrapped', 'Existing registered account promoted by project owner');
+end $$;
+
+commit;
 ```
 
-## Standalone Google Cloud Run Deployment (Recommended for Public & iPhone Safari Access)
-Google AI Studio preview URLs (`ais-dev-*.run.app` and `ais-pre-*.run.app`) sit behind an upstream Google hosting proxy (`/__cookie_check.html`) that triggers Safari cookie warnings on older or privacy-restricted iOS devices. To provide a single public link that opens directly in iPhone Safari, Android Chrome, WhatsApp links, and desktop browsers with zero Google proxy gate, deploy directly to your own Google Cloud Run service using the included `Dockerfile`:
-
-```bash
-gcloud run deploy digc-owerri-portal \
-  --source . \
-  --region europe-west2 \
-  --allow-unauthenticated \
-  --set-env-vars "NODE_ENV=production,SESSION_SECRET=$(openssl rand -hex 32)"
-```
-
-### Production Storage & Email Notes
-- **Persistent Data**: The SQLite database (`data/fellowship.db`) and uploaded profile photos (`data/uploads/`) are stored in `/app/data`. Mount a persistent volume (e.g., Cloud Storage FUSE / Filestore / persistent disk) to `/app/data` in Cloud Run or run on a persistent-disk host (Render/Railway/Fly.io/VPS) so member registrations and uploaded photographs persist across restarts.
-- **Transactional Password Reset Email**: Set `RESEND_API_KEY` and `EMAIL_FROM` in environment variables to deliver password reset links automatically.
-
-## Custom Domain Mapping (`digcowerri.com`)
-To serve the portal at **`https://digcowerri.com`**:
-1. **Register the domain** `digcowerri.com` at your domain registrar.
-2. **Map the domain** in Google Cloud Run (or your hosting provider) to the deployed service.
-3. **Configure DNS & SSL** at your domain registrar using the `A`/`AAAA` or `CNAME` records provided by your host for `digcowerri.com` and `www.digcowerri.com`.
-4. **Set `APP_URL`** in your production environment variables to `https://digcowerri.com`.
+Do not create a replacement account and do not implement automatic self-promotion. Additional administrators are assigned by an existing administrator from **Membership Access**. The API and database both enforce the maximum of three administrators.
 

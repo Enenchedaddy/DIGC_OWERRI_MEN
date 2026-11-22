@@ -1,12 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { AuthProvider, useAuth } from './context/AuthContext';
-import { AdminAnnouncementsPage } from './pages/AdminAnnouncementsPage';
-import { AdminDashboard } from './pages/AdminDashboard';
 import { AdminMembersPage } from './pages/AdminMembersPage';
-import { AdminSettingsPage } from './pages/AdminSettingsPage';
-import { AnnouncementsPage } from './pages/AnnouncementsPage';
 import {
-  AdminBootstrapPage,
   ForgotPasswordPage,
   LoginPage,
   PendingApprovalPage,
@@ -14,9 +9,7 @@ import {
   ResetPasswordPage,
   UnauthorizedPage,
 } from './pages/AuthPages';
-import { BirthdaysPage } from './pages/BirthdaysPage';
 import { LandingPage } from './pages/LandingPage';
-import { MemberDashboard } from './pages/MemberDashboard';
 import { MemberDirectory } from './pages/MemberDirectory';
 import { MemberProfilePage } from './pages/MemberProfilePage';
 import { MyProfilePage } from './pages/MyProfilePage';
@@ -49,12 +42,13 @@ const PUBLIC_ROUTES: AppRoute[] = [
   'register',
   'forgot-password',
   'reset-password',
-  'admin-setup',
 ];
 
-const ADMIN_ROUTES: AppRoute[] = [
+const ADMIN_ROUTES: AppRoute[] = ['admin-members'];
+
+const LEGACY_MEMBER_ROUTES: AppRoute[] = ['dashboard', 'birthdays', 'announcements'];
+const LEGACY_ADMIN_ROUTES: AppRoute[] = [
   'admin-dashboard',
-  'admin-members',
   'admin-announcements',
   'admin-settings',
 ];
@@ -109,7 +103,7 @@ function PortalRouter() {
   useEffect(() => {
     if (loading || !user || user.membership_status !== 'approved') return;
     if (route === 'login' || route === 'pending') {
-      const target: AppRoute = user.role === 'admin' ? 'admin-dashboard' : 'directory';
+      const target: AppRoute = 'directory';
       const nextPath = ROUTE_TO_PATH[target];
       if (window.location.pathname !== nextPath) {
         window.history.replaceState({ route: target }, '', nextPath);
@@ -140,11 +134,7 @@ function PortalRouter() {
       if (user.membership_status !== 'approved') {
         return <PendingApprovalPage onNavigate={navigate} />;
       }
-      return user.role === 'admin' ? (
-        <AdminDashboard onNavigate={navigate} onSelectMember={openMemberProfile} />
-      ) : (
-        <MemberDirectory onNavigate={navigate} onSelectMember={openMemberProfile} />
-      );
+      return <MemberDirectory onNavigate={navigate} onSelectMember={openMemberProfile} />;
     }
     return <LoginPage onNavigate={navigate} />;
   }
@@ -157,9 +147,7 @@ function PortalRouter() {
   if (route === 'reset-password') {
     return <ResetPasswordPage onNavigate={navigate} />;
   }
-  if (route === 'admin-setup') {
-    return <AdminBootstrapPage onNavigate={navigate} />;
-  }
+  if (route === 'admin-setup') return <LoginPage onNavigate={navigate} />;
 
   // Authentication gate for all private routes
   if (!user) {
@@ -172,10 +160,18 @@ function PortalRouter() {
   }
 
   if (route === 'pending') {
+    return <MemberDirectory onNavigate={navigate} onSelectMember={openMemberProfile} />;
+  }
+
+  if (LEGACY_MEMBER_ROUTES.includes(route)) {
+    return <MemberDirectory onNavigate={navigate} onSelectMember={openMemberProfile} />;
+  }
+
+  if (LEGACY_ADMIN_ROUTES.includes(route)) {
     return user.role === 'admin' ? (
-      <AdminDashboard onNavigate={navigate} onSelectMember={openMemberProfile} />
+      <AdminMembersPage onNavigate={navigate} onSelectMember={openMemberProfile} />
     ) : (
-      <MemberDirectory onNavigate={navigate} onSelectMember={openMemberProfile} />
+      <UnauthorizedPage onNavigate={navigate} />
     );
   }
 
@@ -185,8 +181,6 @@ function PortalRouter() {
   }
 
   switch (route) {
-    case 'dashboard':
-      return <MemberDashboard onNavigate={navigate} onSelectMember={openMemberProfile} />;
     case 'directory':
       return <MemberDirectory onNavigate={navigate} onSelectMember={openMemberProfile} />;
     case 'member-profile':
@@ -197,22 +191,12 @@ function PortalRouter() {
       );
     case 'my-profile':
       return <MyProfilePage onNavigate={navigate} />;
-    case 'birthdays':
-      return <BirthdaysPage onNavigate={navigate} onSelectMember={openMemberProfile} />;
-    case 'announcements':
-      return <AnnouncementsPage onNavigate={navigate} />;
-    case 'admin-dashboard':
-      return <AdminDashboard onNavigate={navigate} onSelectMember={openMemberProfile} />;
     case 'admin-members':
       return <AdminMembersPage onNavigate={navigate} onSelectMember={openMemberProfile} />;
-    case 'admin-announcements':
-      return <AdminAnnouncementsPage onNavigate={navigate} />;
-    case 'admin-settings':
-      return <AdminSettingsPage onNavigate={navigate} />;
     case 'unauthorized':
       return <UnauthorizedPage onNavigate={navigate} />;
     default:
-      return <MemberDashboard onNavigate={navigate} onSelectMember={openMemberProfile} />;
+      return <MemberDirectory onNavigate={navigate} onSelectMember={openMemberProfile} />;
   }
 }
 

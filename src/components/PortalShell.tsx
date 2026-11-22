@@ -1,12 +1,7 @@
 import {
-  Cake,
-  LayoutDashboard,
   LogOut,
-  Megaphone,
   Menu,
-  Settings,
   ShieldCheck,
-  UserCheck,
   UserCircle,
   Users,
   X,
@@ -37,18 +32,12 @@ export function PortalShell({
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   const memberLinks: Array<{ route: AppRoute; label: string; icon: React.ComponentType<{ className?: string }> }> = [
-    { route: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
     { route: 'directory', label: 'Member Directory', icon: Users },
-    { route: 'birthdays', label: 'Birthdays', icon: Cake },
-    { route: 'announcements', label: 'Announcements', icon: Megaphone },
     { route: 'my-profile', label: 'My Profile', icon: UserCircle },
   ];
 
   const adminLinks: Array<{ route: AppRoute; label: string; icon: React.ComponentType<{ className?: string }> }> = [
-    { route: 'admin-dashboard', label: 'Admin Overview', icon: ShieldCheck },
-    { route: 'admin-members', label: 'Member Management', icon: UserCheck },
-    { route: 'admin-announcements', label: 'Manage Announcements', icon: Megaphone },
-    { route: 'admin-settings', label: 'Fellowship Settings', icon: Settings },
+    { route: 'admin-members', label: 'Membership Access', icon: ShieldCheck },
   ];
 
   const handleNav = (route: AppRoute) => {
@@ -70,7 +59,7 @@ export function PortalShell({
         <div className="px-2">
           <button
             type="button"
-            onClick={() => handleNav('dashboard')}
+            onClick={() => handleNav('directory')}
             className="flex items-center gap-3 text-left focus-visible:outline-2 focus-visible:outline-offset-2"
           >
             <img
@@ -86,7 +75,9 @@ export function PortalShell({
         </div>
 
         <nav aria-label="Member navigation" className="space-y-1">
-          <p className="px-2 pb-1 text-xs font-medium text-slate-500">Fellowship</p>
+          <p className="px-2 pb-1 text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-400">
+            Directory
+          </p>
           {memberLinks.map((item) => {
             const Icon = item.icon;
             const active =
@@ -112,7 +103,9 @@ export function PortalShell({
 
         {user?.role === 'admin' && (
           <nav aria-label="Administrator navigation" className="space-y-1 pt-2 border-t border-slate-200">
-            <p className="px-2 pb-1 text-xs font-medium text-slate-500">Administration</p>
+            <p className="px-2 pb-1 text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-400">
+              Administration
+            </p>
             {adminLinks.map((item) => {
               const Icon = item.icon;
               const active = currentRoute === item.route;
@@ -163,7 +156,7 @@ export function PortalShell({
   return (
     <div className="min-h-screen bg-[#FAF9F6] text-slate-900 flex">
       {/* Desktop Sidebar */}
-      <aside className="hidden lg:block w-[260px] shrink-0 sticky top-0 h-screen">
+      <aside className="hidden lg:block w-[248px] shrink-0 sticky top-0 h-screen">
         {sidebarContent}
       </aside>
 
@@ -191,18 +184,6 @@ export function PortalShell({
 
       {/* Main Content Column */}
       <div className="relative flex-1 min-w-0 flex flex-col">
-        {/* Subtle Official Church Emblem Watermark */}
-        <div
-          aria-hidden="true"
-          className="pointer-events-none select-none fixed inset-0 lg:left-[260px] z-0 flex items-center justify-center overflow-hidden"
-        >
-          <img
-            src={logoUrl}
-            alt=""
-            className="w-[340px] sm:w-[460px] max-w-[75vw] rounded-full object-cover opacity-[0.045] grayscale-[20%]"
-          />
-        </div>
-
         <header className="sticky top-0 z-30 bg-[#FAF9F6]/95 backdrop-blur-sm border-b border-slate-200 px-4 sm:px-8 py-4">
           <div className="max-w-6xl mx-auto flex items-center justify-between gap-4">
             <div className="flex items-center gap-3 min-w-0">
@@ -227,14 +208,14 @@ export function PortalShell({
           </div>
         </header>
 
-        <main className="relative z-10 flex-1 px-4 sm:px-8 py-6 sm:py-8">
+        <main className="relative flex-1 px-4 sm:px-8 py-6 sm:py-8">
           <div className="max-w-6xl mx-auto">{children}</div>
         </main>
 
-        <footer className="relative z-10 border-t border-slate-200/80 px-4 sm:px-8 py-4 text-xs text-slate-500">
+        <footer className="border-t border-slate-200/80 px-4 sm:px-8 py-4 text-xs text-slate-500">
           <div className="max-w-6xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-2">
-            <p className="font-medium text-slate-600">{fellowshipName} · Men&apos;s Fellowship Portal</p>
-            <p>{publicInfo?.official_domain || 'digcowerri.com'} · Owerri, Imo State, Nigeria · WAT (Africa/Lagos)</p>
+            <p className="font-medium text-slate-600">{fellowshipName} · Private Member Directory</p>
+            <p>{publicInfo?.official_domain || 'digcowerri.com'} · Owerri, Imo State, Nigeria</p>
           </div>
         </footer>
       </div>

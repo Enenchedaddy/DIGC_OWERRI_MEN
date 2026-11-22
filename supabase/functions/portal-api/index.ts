@@ -397,41 +397,11 @@ Deno.serve(async (req: Request) => {
     }
 
     if (req.method === 'POST' && path === '/api/auth/bootstrap-admin') {
-      const { count } = await service.from('user_roles').select('id', { count: 'exact', head: true }).eq('role', 'admin');
-      if ((count || 0) > 0) return fail(req, 'Initial administrator has already been provisioned.', 403);
-      const body = await readBody(req);
-      const fullName = clean(body.full_name, 120);
-      const email = clean(body.email, 160).toLowerCase();
-      const rawPhone = clean(body.phone_number, 40);
-      const password = typeof body.password === 'string' ? body.password : '';
-      if (fullName.length < 2 || !emailIsValid(email) || !phoneIsValid(rawPhone) || password.length < 8) {
-        return fail(req, 'Provide a full name, valid email and phone number, and a password of at least 8 characters.');
-      }
-      const { data: created, error } = await service.auth.admin.createUser({
-        email,
-        password,
-        email_confirm: true,
-        user_metadata: {
-          full_name: fullName,
-          phone_number: normalizePhone(rawPhone),
-          occupation: 'Fellowship Leadership',
-          professional_designation: 'Portal Administrator',
-          fellowship_responsibilities: 'Fellowship Administration & Oversight',
-          membership_category: 'Leadership',
-          date_of_joining: new Date().toISOString().slice(0, 10),
-          residential_location: 'Owerri, Imo State, Nigeria',
-        },
-      });
-      if (error || !created.user) return fail(req, error?.message || 'Unable to provision administrator.', 400);
-      await Promise.all([
-        service.from('profiles').update({ membership_status: 'approved' }).eq('id', created.user.id),
-        service.from('user_roles').update({ role: 'admin' }).eq('user_id', created.user.id),
-      ]);
-      await logActivity(created.user.id, 'admin_bootstrapped', `Initial administrator provisioned: ${email}`);
-      const anon = newAnonClient();
-      const { data: signedIn, error: signInError } = await anon.auth.signInWithPassword({ email, password });
-      if (signInError) return fail(req, signInError.message, 500);
-      return await authResponse(req, signedIn.session, 201);
+      return fail(
+        req,
+        'Administrator initialization is available only through a protected project-owner operation on an existing account.',
+        403,
+      );
     }
 
     if (req.method === 'POST' && path === '/api/auth/login') {
@@ -685,7 +655,9 @@ Deno.serve(async (req: Request) => {
       const [{ data: profiles, error }, roles, privacy] = await Promise.all([
         service.from('profiles').select('*').order('created_at', { ascending: false }),
         service.from('user_roles').select('user_id,role'),
-        service.from('profile_privacy').select('*'),
+        service
+          .from('profile_privacy')
+          .select('user_id,phone_visibility,email_visibility,workplace_visibility,birthday_visibility,location_visibility'),
       ]);
       if (error) return fail(req, error.message, 500);
       const roleMap = new Map((roles.data || []).map((r) => [r.user_id, r.role]));
@@ -695,7 +667,18 @@ Deno.serve(async (req: Request) => {
       const role = clean(url.searchParams.get('role'), 30);
       const members = (profiles || []).map((p) => ({ ...p, role: roleMap.get(p.id) || 'member', ...privacyMap.get(p.id) }))
         .filter((p) => (!search || `${p.full_name} ${p.email} ${p.occupation || ''}`.toLowerCase().includes(search)) && (!status || status === 'all' || p.membership_status === status) && (!role || role === 'all' || p.role === role));
-      return json(req, { members });
+      const allProfiles = profiles || [];
+      return json(req, {
+        members,
+        summary: {
+          total: allProfiles.length,
+          pending: allProfiles.filter((p) => p.membership_status === 'pending').length,
+          approved: allProfiles.filter((p) => p.membership_status === 'approved').length,
+          suspended: allProfiles.filter((p) => p.membership_status === 'suspended').length,
+          admins: [...roleMap.values()].filter((value) => value === 'admin').length,
+          admin_limit: 3,
+        },
+      });
     }
 
     const statusMatch = path.match(/^\/api\/admin\/members\/([0-9a-f-]+)\/status$/i);
@@ -706,6 +689,13 @@ Deno.serve(async (req: Request) => {
       const status = clean(body.membership_status, 30);
       if (!['pending','approved','rejected','suspended'].includes(status)) return fail(req, 'Invalid membership status.');
       if (statusMatch[1] === admin.id && status !== 'approved') return fail(req, 'You cannot remove your own approved access.', 409);
+      const [{ data: targetRole }, { count: approvedAdminCount }] = await Promise.all([
+        service.from('user_roles').select('role').eq('user_id', statusMatch[1]).maybeSingle(),
+        service.from('user_roles').select('user_id', { count: 'exact', head: true }).eq('role', 'admin'),
+      ]);
+      if (targetRole?.role === 'admin' && status !== 'approved' && (approvedAdminCount || 0) <= 1) {
+        return fail(req, 'The final administrator must remain approved and active.', 409);
+      }
       const { error } = await service.from('profiles').update({ membership_status: status, updated_at: new Date().toISOString() }).eq('id', statusMatch[1]);
       if (error) return fail(req, error.message, 400);
       await logActivity(admin.id, 'member_status_changed', `${statusMatch[1]} → ${status}`);
@@ -719,11 +709,17 @@ Deno.serve(async (req: Request) => {
       const body = await readBody(req);
       const role = clean(body.role, 20);
       if (!['admin','member'].includes(role)) return fail(req, 'Invalid user role.');
-      if (roleMatch[1] === admin.id && role !== 'admin') {
-        const { count } = await service.from('user_roles').select('id', { count: 'exact', head: true }).eq('role', 'admin');
-        if ((count || 0) <= 1) return fail(req, 'The final administrator cannot be demoted.', 409);
+      const [{ data: currentRole }, { count: adminCount }] = await Promise.all([
+        service.from('user_roles').select('role').eq('user_id', roleMatch[1]).maybeSingle(),
+        service.from('user_roles').select('id', { count: 'exact', head: true }).eq('role', 'admin'),
+      ]);
+      if (currentRole?.role === 'admin' && role === 'member' && (adminCount || 0) <= 1) {
+        return fail(req, 'The final administrator cannot be demoted.', 409);
       }
       if (role === 'admin') {
+        if (currentRole?.role !== 'admin' && (adminCount || 0) >= 3) {
+          return fail(req, 'All three administrator positions are already assigned.', 409);
+        }
         const { data: target } = await service.from('profiles').select('membership_status').eq('id', roleMatch[1]).single();
         if (target?.membership_status !== 'approved') return fail(req, 'Approve the member before granting administrator access.', 409);
       }

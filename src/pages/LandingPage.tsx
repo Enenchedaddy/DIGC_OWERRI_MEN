@@ -15,7 +15,7 @@ export function LandingPage({ onNavigate }: LandingPageProps) {
   const handleSignInAction = () => {
     if (user) {
       if (user.membership_status === 'approved') {
-        onNavigate('dashboard');
+        onNavigate('directory');
       } else {
         onNavigate('pending');
       }
@@ -87,11 +87,11 @@ export function LandingPage({ onNavigate }: LandingPageProps) {
                 className="font-display font-bold tracking-tight text-[#0F172A] leading-[1.12]"
                 style={{ fontSize: 'clamp(2rem, 3.6vw, 3.15rem)', textWrap: 'balance' }}
               >
-                A private home for men walking together in faith and purpose.
+                Know the men you worship, serve, and grow with.
               </h1>
 
               <p className="mt-5 text-base sm:text-lg leading-relaxed text-slate-600 max-w-xl">
-                A private digital home connecting the men of Dunamis International Gospel Centre, Owerri, for fellowship, connection, accountability and growth.
+                The verified member directory for DIGC Owerri Men&apos;s Fellowship—built to help approved members find, know, and connect with one another.
               </p>
 
               <div className="mt-8 flex flex-col sm:flex-row sm:items-center gap-3.5">

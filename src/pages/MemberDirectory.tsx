@@ -1,4 +1,4 @@
-import { ChevronLeft, ChevronRight, Search, Users } from 'lucide-react';
+import { ArrowUpRight, ChevronLeft, ChevronRight, Search, Users } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { MemberAvatar } from '../components/MemberAvatar';
 import { PortalShell } from '../components/PortalShell';
@@ -85,15 +85,15 @@ export function MemberDirectory({
     <PortalShell
       currentRoute="directory"
       onNavigate={onNavigate}
-      title="Member Directory"
+      title="Men's Fellowship Directory"
       subtitle={
         data
-          ? `${data.pagination.total} verified fellowship ${data.pagination.total === 1 ? 'member' : 'members'}`
-          : 'Search and connect with verified fellowship members'
+          ? `${data.pagination.total} approved ${data.pagination.total === 1 ? 'member' : 'members'} · Search by name, role, vocation, or skill`
+          : 'The private directory of approved fellowship members'
       }
     >
       {/* Search & Filter Controls */}
-      <div className="rounded-xl border border-slate-200 bg-white p-4 mb-6">
+      <div className="rounded-xl border border-slate-200 bg-white p-4 sm:p-5 mb-6 shadow-[0_1px_2px_rgba(15,23,42,0.03)]">
         <div className="grid grid-cols-1 md:grid-cols-12 gap-3">
           <div className="md:col-span-5 relative">
             <Search className="h-4 w-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
@@ -164,9 +164,9 @@ export function MemberDirectory({
       )}
 
       {loading ? (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
+        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-5">
           {[1, 2, 3, 4, 5, 6].map((i) => (
-            <div key={i} className="h-44 rounded-xl border border-slate-200 bg-white animate-pulse" />
+            <div key={i} className="h-52 rounded-xl border border-slate-200 bg-white animate-pulse" />
           ))}
         </div>
       ) : data && data.members.length === 0 ? (
@@ -188,39 +188,44 @@ export function MemberDirectory({
         </div>
       ) : data ? (
         <>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
+          <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-5">
             {data.members.map((member) => (
               <button
                 key={member.id}
                 type="button"
                 onClick={() => onSelectMember(member.id)}
-                className="text-left rounded-xl border border-slate-200 bg-white p-5 hover:border-slate-300 hover:shadow-sm transition-all flex flex-col justify-between"
+                className="group relative overflow-hidden text-left rounded-xl border border-slate-200 border-t-[3px] border-t-[#B47B07] bg-white p-5 hover:-translate-y-0.5 hover:border-slate-300 hover:shadow-[0_10px_28px_rgba(15,23,42,0.08)] transition-all flex min-h-[210px] flex-col justify-between focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#4B1C6F]"
               >
                 <div className="flex items-start gap-4">
-                  <MemberAvatar src={member.profile_image} name={member.full_name} size="lg" />
+                  <MemberAvatar src={member.profile_image} name={member.full_name} size="xl" className="rounded-xl" />
                   <div className="min-w-0 flex-1">
-                    <h2 className="font-display text-base font-semibold text-slate-900 truncate">
+                    <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-[#8A5B00] line-clamp-2">
+                      {member.fellowship_responsibilities || member.membership_category || 'Fellowship Member'}
+                    </p>
+                    <h2 className="mt-1.5 font-display text-lg font-bold leading-tight text-slate-900 line-clamp-2">
                       {member.full_name}
                     </h2>
-                    <p className="mt-0.5 text-sm font-medium text-slate-700 truncate">
+                    <p className="mt-2 text-sm font-medium text-slate-700 line-clamp-2">
                       {member.occupation || 'Fellowship Member'}
                     </p>
                     {member.professional_designation && (
-                      <p className="text-xs text-slate-500 truncate">{member.professional_designation}</p>
+                      <p className="mt-0.5 text-xs text-slate-500 line-clamp-1">{member.professional_designation}</p>
                     )}
                   </div>
                 </div>
 
-                <div className="mt-4 pt-3 border-t border-slate-100 text-xs text-slate-500 flex items-center justify-between gap-2">
+                <div className="mt-5 pt-3 border-t border-slate-100 text-xs text-slate-500 flex items-center justify-between gap-3">
                   <span className="truncate">
-                    {member.membership_category || 'General Member'}
                     {(() => {
                       const cityState = [member.city, member.state].filter(Boolean).join(', ');
                       const displayLoc = cityState || member.residential_location;
-                      return displayLoc ? ` · ${displayLoc}` : '';
+                      return displayLoc || 'DIGC Owerri';
                     })()}
                   </span>
-                  <span className="font-medium text-[#4B1C6F] shrink-0">View</span>
+                  <span className="inline-flex items-center gap-1 font-semibold text-[#4B1C6F] shrink-0">
+                    View profile
+                    <ArrowUpRight className="h-3.5 w-3.5 transition-transform group-hover:translate-x-0.5 group-hover:-translate-y-0.5" />
+                  </span>
                 </div>
               </button>
             ))}

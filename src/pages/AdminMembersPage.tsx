@@ -9,6 +9,15 @@ import { ApiError, apiFetch } from '../services/api';
 import { AdminMemberRecord, AppRoute, BirthdayVisibility, FieldVisibility, MembershipStatus, UserRole } from '../types';
 import { formatDateDDMMYYYY, isValidNigerianOrIntlPhone, NIGERIAN_STATES } from '../utils/formatters';
 
+interface MembershipSummary {
+  total: number;
+  pending: number;
+  approved: number;
+  suspended: number;
+  admins: number;
+  admin_limit: number;
+}
+
 export function AdminMembersPage({
   onNavigate,
   onSelectMember,
@@ -18,6 +27,14 @@ export function AdminMembersPage({
 }) {
   const { user } = useAuth();
   const [members, setMembers] = useState<AdminMemberRecord[]>([]);
+  const [summary, setSummary] = useState<MembershipSummary>({
+    total: 0,
+    pending: 0,
+    approved: 0,
+    suspended: 0,
+    admins: 0,
+    admin_limit: 3,
+  });
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [roleFilter, setRoleFilter] = useState<string>('all');
@@ -51,10 +68,11 @@ export function AdminMembersPage({
       if (statusFilter !== 'all') params.set('status', statusFilter);
       if (roleFilter !== 'all') params.set('role', roleFilter);
 
-      const res = await apiFetch<{ members: AdminMemberRecord[] }>(
+      const res = await apiFetch<{ members: AdminMemberRecord[]; summary: MembershipSummary }>(
         `/api/admin/members?${params.toString()}`
       );
       setMembers(res.members);
+      setSummary(res.summary);
       setError(null);
     } catch (err) {
       setError(err instanceof ApiError ? err.message : 'Unable to load member records.');
@@ -197,12 +215,128 @@ export function AdminMembersPage({
     }
   };
 
+  const openMemberEditor = (member: AdminMemberRecord) => {
+    setIssuedReset(null);
+    setCopiedReset(false);
+    setEditingMember(member);
+  };
+
+  const renderMemberActions = (member: AdminMemberRecord, mobile = false) => (
+    <div className={`flex flex-wrap items-center gap-2 ${mobile ? 'justify-start' : 'justify-end'}`}>
+      {member.membership_status === 'pending' && (
+        <>
+          <button
+            type="button"
+            onClick={() => handleStatusChange(member.id, 'approved')}
+            className="inline-flex min-h-[36px] items-center gap-1 rounded-lg bg-emerald-700 px-3 py-1.5 text-xs font-semibold text-white hover:bg-emerald-800"
+          >
+            <Check className="h-3.5 w-3.5" />
+            Approve
+          </button>
+          <button
+            type="button"
+            onClick={() =>
+              setConfirmAction({
+                type: 'status',
+                id: member.id,
+                name: member.full_name,
+                nextValue: 'rejected',
+                title: 'Reject Registration',
+                description: `Reject ${member.full_name}'s fellowship registration?`,
+                confirmLabel: 'Reject',
+                destructive: true,
+              })
+            }
+            className="inline-flex min-h-[36px] items-center gap-1 rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50"
+          >
+            <X className="h-3.5 w-3.5" />
+            Reject
+          </button>
+        </>
+      )}
+
+      {member.membership_status === 'approved' && member.id !== user?.id && (
+        <button
+          type="button"
+          onClick={() =>
+            setConfirmAction({
+              type: 'status',
+              id: member.id,
+              name: member.full_name,
+              nextValue: 'suspended',
+              title: 'Suspend Member Account',
+              description: `Suspend ${member.full_name}'s directory access until an administrator reactivates it?`,
+              confirmLabel: 'Suspend Account',
+              destructive: true,
+            })
+          }
+          className="inline-flex min-h-[36px] items-center gap-1 rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50"
+        >
+          <UserX className="h-3.5 w-3.5" />
+          Suspend
+        </button>
+      )}
+
+      {(member.membership_status === 'suspended' || member.membership_status === 'rejected') && (
+        <button
+          type="button"
+          onClick={() => handleStatusChange(member.id, 'approved')}
+          className="inline-flex min-h-[36px] items-center gap-1 rounded-lg border border-emerald-200 bg-white px-3 py-1.5 text-xs font-medium text-emerald-700 hover:bg-emerald-50"
+        >
+          <UserCheck className="h-3.5 w-3.5" />
+          Reactivate
+        </button>
+      )}
+
+      {member.membership_status === 'approved' && member.id !== user?.id && (
+        <button
+          type="button"
+          onClick={() =>
+            setConfirmAction({
+              type: 'role',
+              id: member.id,
+              name: member.full_name,
+              nextValue: member.role === 'admin' ? 'member' : 'admin',
+              title: member.role === 'admin' ? 'Revoke Administrator Role' : 'Assign Administrator Role',
+              description:
+                member.role === 'admin'
+                  ? `Return ${member.full_name} to standard member access?`
+                  : `Grant ${member.full_name} administrator access to review members and manage directory access? Only three administrator positions are available.`,
+              confirmLabel: member.role === 'admin' ? 'Demote to Member' : 'Make Administrator',
+              destructive: member.role === 'admin',
+            })
+          }
+          disabled={member.role !== 'admin' && summary.admins >= summary.admin_limit}
+          title={
+            member.role !== 'admin' && summary.admins >= summary.admin_limit
+              ? 'All three administrator positions are assigned'
+              : undefined
+          }
+          className="inline-flex min-h-[36px] items-center gap-1 rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-45"
+        >
+          <Shield className="h-3.5 w-3.5" />
+          {member.role === 'admin' ? 'Demote' : 'Make Admin'}
+        </button>
+      )}
+
+      <button
+        type="button"
+        onClick={() => openMemberEditor(member)}
+        aria-label={`Edit ${member.full_name}`}
+        className="inline-flex min-h-[36px] items-center gap-1 rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50"
+      >
+        <Edit3 className="h-3.5 w-3.5" />
+        Edit
+      </button>
+    </div>
+  );
+
   return (
     <PortalShell
       currentRoute="admin-members"
       onNavigate={onNavigate}
-      title="Member Management"
-      subtitle="Approve registrations, manage access status, edit member records, and assign administrators"
+      title="Membership Access"
+      subtitle="Review registrations, control directory access, and manage up to three administrators"
       headerAction={
         <button
           type="button"
@@ -224,6 +358,20 @@ export function AdminMembersPage({
           {error}
         </div>
       )}
+
+      <section aria-label="Membership summary" className="mb-6 grid grid-cols-2 gap-3 lg:grid-cols-4">
+        {[
+          ['Pending review', summary.pending, 'text-[#8A5B00]'],
+          ['Approved members', summary.approved, 'text-emerald-700'],
+          ['Suspended', summary.suspended, 'text-red-700'],
+          ['Admin positions', `${summary.admins}/${summary.admin_limit}`, 'text-[#4B1C6F]'],
+        ].map(([label, value, color]) => (
+          <div key={label} className="rounded-xl border border-slate-200 bg-white px-4 py-3.5">
+            <p className="text-[11px] font-semibold uppercase tracking-[0.1em] text-slate-500">{label}</p>
+            <p className={`mt-1 font-display text-2xl font-bold ${color}`}>{value}</p>
+          </div>
+        ))}
+      </section>
 
       {/* Search & Filters */}
       <div className="rounded-xl border border-slate-200 bg-white p-4 mb-6 grid grid-cols-1 md:grid-cols-12 gap-3">
@@ -278,7 +426,55 @@ export function AdminMembersPage({
             No member records match the selected filters.
           </div>
         ) : (
-          <div className="overflow-x-auto">
+          <>
+            <div className="space-y-3 p-3 md:hidden">
+              {members.map((member) => (
+                <article key={member.id} className="rounded-xl border border-slate-200 p-4">
+                  <div className="flex items-start gap-3">
+                    <MemberAvatar src={member.profile_image} name={member.full_name} size="sm" />
+                    <div className="min-w-0 flex-1">
+                      <button
+                        type="button"
+                        onClick={() => onSelectMember(member.id)}
+                        className="block truncate text-left font-semibold text-slate-900 hover:text-[#4B1C6F] hover:underline"
+                      >
+                        {member.full_name}
+                      </button>
+                      <p className="truncate text-xs text-slate-500">{member.email}</p>
+                      <p className="mt-1 text-[11px] text-slate-400 font-mono-num">
+                        Joined {formatDateDDMMYYYY(member.date_of_joining || member.created_at)}
+                      </p>
+                    </div>
+                    <span
+                      className={`shrink-0 text-xs font-semibold capitalize ${
+                        member.membership_status === 'approved'
+                          ? 'text-emerald-700'
+                          : member.membership_status === 'pending'
+                          ? 'text-[#B47B07]'
+                          : 'text-red-700'
+                      }`}
+                    >
+                      {member.membership_status}
+                    </span>
+                  </div>
+                  <div className="my-3 grid grid-cols-2 gap-3 border-y border-slate-100 py-3 text-xs">
+                    <div>
+                      <p className="text-slate-400">Occupation</p>
+                      <p className="mt-0.5 truncate font-medium text-slate-700">{member.occupation || 'Not provided'}</p>
+                    </div>
+                    <div>
+                      <p className="text-slate-400">Group / role</p>
+                      <p className="mt-0.5 truncate font-medium capitalize text-slate-700">
+                        {member.membership_category || 'General Member'} · {member.role}
+                      </p>
+                    </div>
+                  </div>
+                  {renderMemberActions(member, true)}
+                </article>
+              ))}
+            </div>
+
+            <div className="hidden overflow-x-auto md:block">
             <table className="w-full text-left border-collapse">
               <thead>
                 <tr className="border-b border-slate-200 bg-slate-50/70 text-xs font-semibold text-slate-600">
@@ -334,121 +530,14 @@ export function AdminMembersPage({
                       {m.role}
                     </td>
                     <td className="py-3.5 px-4">
-                      <div className="flex items-center justify-end gap-2">
-                        {m.membership_status === 'pending' && (
-                          <>
-                            <button
-                              type="button"
-                              onClick={() => handleStatusChange(m.id, 'approved')}
-                              title="Approve Registration"
-                              className="inline-flex min-h-[34px] items-center gap-1 rounded-lg bg-emerald-700 px-2.5 py-1 text-xs font-medium text-white hover:bg-emerald-800"
-                            >
-                              <Check className="h-3.5 w-3.5" />
-                              <span>Approve</span>
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() =>
-                                setConfirmAction({
-                                  type: 'status',
-                                  id: m.id,
-                                  name: m.full_name,
-                                  nextValue: 'rejected',
-                                  title: 'Reject Registration',
-                                  description: `Reject ${m.full_name}'s fellowship registration?`,
-                                  confirmLabel: 'Reject',
-                                  destructive: true,
-                                })
-                              }
-                              className="inline-flex min-h-[34px] items-center gap-1 rounded-lg border border-slate-300 bg-white px-2.5 py-1 text-xs font-medium text-slate-700 hover:bg-slate-50"
-                            >
-                              <X className="h-3.5 w-3.5" />
-                              <span>Reject</span>
-                            </button>
-                          </>
-                        )}
-
-                        {m.membership_status === 'approved' && m.id !== user?.id && (
-                          <button
-                            type="button"
-                            onClick={() =>
-                              setConfirmAction({
-                                type: 'status',
-                                id: m.id,
-                                name: m.full_name,
-                                nextValue: 'suspended',
-                                title: 'Suspend Member Account',
-                                description: `Suspend ${m.full_name}'s portal access? They will immediately lose directory access until reactivated.`,
-                                confirmLabel: 'Suspend Account',
-                                destructive: true,
-                              })
-                            }
-                            className="inline-flex min-h-[34px] items-center gap-1 rounded-lg border border-slate-300 bg-white px-2.5 py-1 text-xs font-medium text-slate-700 hover:bg-slate-50"
-                          >
-                            <UserX className="h-3.5 w-3.5" />
-                            <span>Suspend</span>
-                          </button>
-                        )}
-
-                        {(m.membership_status === 'suspended' || m.membership_status === 'rejected') && (
-                          <button
-                            type="button"
-                            onClick={() => handleStatusChange(m.id, 'approved')}
-                            className="inline-flex min-h-[34px] items-center gap-1 rounded-lg border border-slate-300 bg-white px-2.5 py-1 text-xs font-medium text-emerald-700 hover:bg-emerald-50"
-                          >
-                            <UserCheck className="h-3.5 w-3.5" />
-                            <span>Reactivate</span>
-                          </button>
-                        )}
-
-                        {m.membership_status === 'approved' && m.id !== user?.id && (
-                          <button
-                            type="button"
-                            onClick={() =>
-                              setConfirmAction({
-                                type: 'role',
-                                id: m.id,
-                                name: m.full_name,
-                                nextValue: m.role === 'admin' ? 'member' : 'admin',
-                                title:
-                                  m.role === 'admin'
-                                    ? 'Revoke Administrator Role'
-                                    : 'Assign Administrator Role',
-                                description:
-                                  m.role === 'admin'
-                                    ? `Demote ${m.full_name} back to standard member privileges?`
-                                    : `Grant ${m.full_name} full administrator privileges to approve members, publish announcements, and manage settings?`,
-                                confirmLabel: m.role === 'admin' ? 'Demote to Member' : 'Make Administrator',
-                                destructive: m.role === 'admin',
-                              })
-                            }
-                            className="inline-flex min-h-[34px] items-center gap-1 rounded-lg border border-slate-300 bg-white px-2.5 py-1 text-xs font-medium text-slate-700 hover:bg-slate-50"
-                          >
-                            <Shield className="h-3.5 w-3.5" />
-                            <span>{m.role === 'admin' ? 'Demote' : 'Make Admin'}</span>
-                          </button>
-                        )}
-
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setIssuedReset(null);
-                            setCopiedReset(false);
-                            setEditingMember(m);
-                          }}
-                          aria-label={`Edit ${m.full_name}`}
-                          className="inline-flex min-h-[34px] items-center gap-1 rounded-lg border border-slate-300 bg-white px-2.5 py-1 text-xs font-medium text-slate-700 hover:bg-slate-50"
-                        >
-                          <Edit3 className="h-3.5 w-3.5" />
-                          <span>Edit</span>
-                        </button>
-                      </div>
+                      {renderMemberActions(m)}
                     </td>
                   </tr>
                 ))}
               </tbody>
             </table>
-          </div>
+            </div>
+          </>
         )}
       </div>
 
