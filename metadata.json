@@ -1,0 +1,6 @@
+{
+  "name": "Covenant Men's Fellowship Portal",
+  "description": "A private, role-based community management portal for a Church Men's Fellowship featuring member registration, admin approval, searchable directory, privacy controls, birthdays, and announcements.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
